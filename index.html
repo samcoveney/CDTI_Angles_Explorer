@@ -1,0 +1,666 @@
+<meta charset="utf-8">
+<title>CDTI Angle Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a figure plate (the 3D view) beside a narrow instrument panel; stacks at phone width. */
+  :root {
+    --bg: #f6f6f3;
+    --fg: #1c1d22;
+    --muted: #5d606b;
+    --line: #d9d9d3;
+    --panel: #ffffff;
+    --plate: #fbfbf9;
+    --focus: #0000cc;
+    --chip-on: #ecedf9;
+    /* chart series (validated: light surface) */
+    --sa: #2b3fe0;
+    --e2a: #4fa3e8;
+    --ra-ref: #8a8d97;
+    --aa: #c04fa0;
+    --font-display: "Spectral", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15161a; --fg: #e9e9ec; --muted: #a2a5b0; --line: #34363d; --panel: #1d1e23;
+      --plate: #f4f4f1; --focus: #8c93ff; --chip-on: #2a2c3d;
+      --sa: #6b6bff; --e2a: #2c9ac4; --ra-ref: #8e919c; --aa: #d9668f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15161a; --fg: #e9e9ec; --muted: #a2a5b0; --line: #34363d; --panel: #1d1e23;
+    --plate: #f4f4f1; --focus: #8c93ff; --chip-on: #2a2c3d;
+    --sa: #6b6bff; --e2a: #2c9ac4; --ra-ref: #8e919c; --aa: #d9668f;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding-block: 24px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 20px;
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.9rem;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  header p { margin: 0; color: var(--muted); max-width: 68ch; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+  /* the plate stays light in both themes: it is a figure, drawn in the paper's colours */
+  .plate {
+    position: relative;
+    background: var(--plate);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    aspect-ratio: 1 / 1;
+    max-height: 82vh;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .plate canvas { display: block; }
+  .plate .labels { position: absolute; inset: 0; pointer-events: none; }
+  .plate-bar {
+    position: absolute;
+    left: 10px; right: 10px; bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    font-size: 12px; color: #5d606b;
+    pointer-events: none;
+  }
+  .plate-bar button { pointer-events: auto; }
+  .btn {
+    font: 500 12px var(--font-body);
+    color: #1c1d22;
+    background: #ffffff;
+    border: 1px solid #c9c9c3;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .btn:hover { border-color: #8a8d97; }
+
+  .tag {
+    font: 600 14px var(--font-body);
+    color: #ffffff;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .tag.axis { background: rgba(28, 29, 34, 0.7); font-weight: 500; }
+  .tag.ref {
+    background: none; color: #3a3c44; font: italic 500 13px var(--font-display); padding: 0;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px;
+    display: grid;
+    gap: 18px;
+    min-width: 0;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 8px;
+  }
+
+  .groups { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; }
+  .groups label {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline;
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; cursor: pointer;
+  }
+  .groups input { margin: 0; accent-color: var(--focus); }
+  .groups label:has(input:checked) { background: var(--chip-on); border-color: var(--focus); }
+  .groups .name { font-weight: 600; }
+  .groups .names { grid-column: 2; font: 500 12.5px var(--font-mono); color: var(--muted); }
+  .group-note { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; }
+
+  .sliders { display: grid; gap: 10px; }
+  .slider { display: grid; grid-template-columns: 44px 1fr 58px; gap: 10px; align-items: center; }
+  .slider label { font: 600 14px var(--font-mono); }
+  .slider input { width: 100%; accent-color: var(--focus); }
+  .slider output { font: 500 14px var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+
+  table.readout { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .readout td { padding: 4px 4px; border-top: 1px solid var(--line); vertical-align: baseline; }
+  .readout tr.on td { background: var(--chip-on); }
+  .readout tr.on td:first-child { font-weight: 600; }
+  .readout .ab { font: 600 13px var(--font-mono); white-space: nowrap; }
+  .readout .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .readout .desc { color: var(--muted); }
+  .readout .val { font: 500 13.5px var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .chart-wrap { position: relative; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--fg); margin-bottom: 4px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
+  .chart text { fill: var(--muted); font: 11px var(--font-mono); }
+  .tip {
+    position: absolute; pointer-events: none;
+    background: var(--panel); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 5px 8px; font: 12px var(--font-mono); line-height: 1.45;
+    white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  .formulae { font: 12.5px var(--font-mono); color: var(--muted); margin: 6px 0 0; display: grid; gap: 2px; }
+  .note { font-size: 13px; color: var(--muted); margin: 0; }
+
+  .plate-error {
+    position: absolute; inset: 40% 24px auto; margin: 0; text-align: center;
+    color: #8a1c1c; font-size: 14px;
+  }
+
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>CDTI Angle Explorer</h1>
+    <p>A diffusion tensor in the local left-ventricular frame: radial R, circumferential C, longitudinal L. Set the tensor with EA, TA and RA, then view each family of angles to see how it is measured.</p>
+  </header>
+
+  <div class="layout">
+    <div class="plate" id="plate">
+      <div class="plate-bar">
+        <span>Drag to rotate · scroll to zoom · right-drag to pan</span>
+        <button class="btn" id="reset" type="button">Reset view</button>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <section>
+        <p class="eyebrow">View</p>
+        <fieldset class="groups" id="groups">
+          <legend class="eyebrow" hidden>Angles to show</legend>
+          <label><input type="radio" name="group" id="g-define" value="define" checked><span class="name">Defining angles</span><span class="names">EA · TA · RA</span></label>
+          <label><input type="radio" name="group" id="g-nonproj" value="nonproj"><span class="name">Non-projected angles</span><span class="names">IA · SA · AA</span></label>
+          <label><input type="radio" name="group" id="g-proj" value="proj"><span class="name">Projected angles</span><span class="names">HA · E2A</span></label>
+        </fieldset>
+        <p class="group-note" id="group-note"></p>
+      </section>
+
+      <section>
+        <p class="eyebrow">Tensor</p>
+        <div class="sliders">
+          <div class="slider"><label for="ea">EA</label><input type="range" id="ea" min="-85" max="85" step="1" value="60"><output for="ea" id="ea-out"></output></div>
+          <div class="slider"><label for="ta">TA</label><input type="range" id="ta" min="-85" max="85" step="1" value="30"><output for="ta" id="ta-out"></output></div>
+          <div class="slider"><label for="ra">RA</label><input type="range" id="ra" min="-90" max="90" step="1" value="20"><output for="ra" id="ra-out"></output></div>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">All angles</p>
+        <table class="readout"><tbody id="readout"></tbody></table>
+      </section>
+
+      <section>
+        <p class="eyebrow">Sheetlet angles against RA at this IA</p>
+        <div class="legend" aria-hidden="true">
+          <span><svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--ra-ref)" stroke-width="2" stroke-dasharray="2 3"/></svg>RA</span>
+          <span><svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--sa)" stroke-width="2"/></svg>SA</span>
+          <span><svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--e2a)" stroke-width="2" stroke-dasharray="7 3"/></svg>E2A</span>
+          <span><svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--aa)" stroke-width="2" stroke-dasharray="5 2 1.5 2"/></svg>AA</span>
+        </div>
+        <div class="chart-wrap" id="chart-wrap">
+          <svg class="chart" id="chart" viewBox="0 0 340 250" role="img" aria-label="SA, E2A and AA against RA, for the current intrusion angle"></svg>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <div class="formulae">
+          <span>sin SA = cos IA · sin RA</span>
+          <span>tan E2A = cos IA · tan RA</span>
+          <span>cos AA = cos IA · cos RA, signed like SA</span>
+        </div>
+        <p class="note" id="chart-note"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+// BEGIN angles_math
+// Pure maths, no drawing. Checked against angle_geometry.py by test_math.js.
+// Frame: r = (1, 0, 0), c = (0, 1, 0), l = (0, 0, 1). Angles in degrees.
+const DEG = Math.PI / 180;
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const norm = (a) => scale(a, 1 / Math.hypot(a[0], a[1], a[2]));
+const clamp1 = (x) => Math.max(-1, Math.min(1, x));
+
+// Forward model V = Rf(EA, TA) R_roll(RA_SA=0 + RA): e1 from EA and TA, then e2 and e3 rolled about e1.
+function makeFibre(EA, TA, RA) {
+  const ea = EA * DEG, ta = TA * DEG, ra = RA * DEG;
+  const f1 = [Math.sin(ta) * Math.cos(ea), Math.cos(ta) * Math.cos(ea), Math.sin(ea)];
+  const f2 = [-Math.sin(ta) * Math.sin(ea), -Math.cos(ta) * Math.sin(ea), Math.cos(ea)];
+  const f3 = [Math.cos(ta), -Math.sin(ta), 0];
+  const raSA0 = Math.atan(Math.tan(ta) * Math.sin(ea));
+  const roll = (phi) => [add(scale(f2, Math.cos(phi)), scale(f3, Math.sin(phi))),
+                         add(scale(f2, -Math.sin(phi)), scale(f3, Math.cos(phi)))];
+  const [e2, e3] = roll(raSA0 + ra);
+  const [e2SA0] = roll(raSA0);
+  return { e1: f1, e2, e3, e2SA0 };
+}
+
+// Every angle measured geometrically from the vectors (not from the closed-form relations).
+function computeAngles(EA, TA, RA) {
+  const r = [1, 0, 0], c = [0, 1, 0], l = [0, 0, 1];
+  const { e1, e2, e3 } = makeFibre(EA, TA, RA);
+  const vcm = norm(cross(r, e1));
+  const IA = Math.asin(clamp1(dot(e1, r))) / DEG;
+  const SA = Math.asin(clamp1(dot(e2, r))) / DEG;
+  const AA = (SA >= 0 ? 1 : -1) * Math.acos(clamp1(dot(e3, r))) / DEG;  // signed like SA, + when SA = 0
+  const HA = Math.atan2(dot(e1, l), dot(e1, c)) / DEG;
+  const E2A = Math.atan(dot(e2, r) / dot(e2, vcm)) / DEG;
+  return {
+    EA: Math.asin(clamp1(dot(e1, l))) / DEG,
+    TA: Math.atan2(dot(e1, r), dot(e1, c)) / DEG,
+    RA: Math.atan2(dot(cross(vcm, e2), e1), dot(vcm, e2)) / DEG,  // signed angle v_cm -> e2 about e1
+    IA, SA, AA, HA, E2A,
+  };
+}
+// END angles_math
+
+const COLORS = { EA: "#CC0000", HA: "#CC0000", TA: "#009900", IA: "#009900",
+                 RA: "#0000CC", SA: "#0000CC", AA: "#0000CC", E2A: "#0000CC" };
+const GROUPS = {
+  define: { angles: ["EA", "TA", "RA"],
+            note: "The forward model. EA and TA place the fibre e1; RA rolls the sheetlet about e1, starting from the cross-myocyte vector v_cm." },
+  nonproj: { angles: ["IA", "SA", "AA"],
+             note: "Measured directly against the LV frame, with no projection: e1 and e2 against the radial plane (C–L, normal to R), e3 against R." },
+  proj: { angles: ["HA", "E2A"],
+          note: "The conventional angles. Each first projects an eigenvector into a plane: e1 into the radial plane for HA, e2 into the v_cm–R plane for E2A." },
+};
+const ROWS = [
+  ["EA", "e1 elevation out of the R–C plane"],
+  ["TA", "e1 azimuth in the R–C plane, from C"],
+  ["RA", "e2 roll about e1, from v_cm"],
+  ["IA", "e1 against the radial plane"],
+  ["SA", "e2 against the radial plane"],
+  ["AA", "e3 against R, signed like SA"],
+  ["HA", "e1 in the radial plane, from C"],
+  ["E2A", "e2 in the v_cm–R plane, from v_cm"],
+];
+
+const state = { EA: 60, TA: 30, RA: 20, group: "define" };
+const plate = document.getElementById("plate");
+let view = null;  // the 3D view, once it has started
+
+// ---------------------------------------------------------------- panel
+const fmt = (x) => (x < -0.05 ? "−" : x > 0.05 ? "+" : "") + Math.abs(x).toFixed(1) + "°";
+const readout = document.getElementById("readout");
+readout.innerHTML = ROWS.map(([k, d]) =>
+  `<tr data-k="${k}"><td class="ab"><span class="chip" style="background:${COLORS[k]}"></span>${k}</td>` +
+  `<td class="desc">${d}</td><td class="val" id="v-${k}"></td></tr>`).join("");
+
+// chart: SA and E2A against RA, at the current IA
+const svg = document.getElementById("chart");
+const tip = document.getElementById("tip");
+const M = { l: 40, r: 12, t: 12, b: 34 }, W = 340, H = 250;
+const xs = (ra) => M.l + (ra + 90) / 180 * (W - M.l - M.r);
+const ys = (a) => M.t + (90 - a) / 180 * (H - M.t - M.b);
+const raFromX = (x) => Math.max(-90, Math.min(90, (x - M.l) / (W - M.l - M.r) * 180 - 90));
+const saOf = (ra, ia) => Math.asin(clamp1(Math.cos(ia * DEG) * Math.sin(ra * DEG))) / DEG;
+const e2aOf = (ra, ia) => Math.atan(Math.cos(ia * DEG) * Math.tan(ra * DEG)) / DEG;
+// signed like SA (+ when SA = 0), so it jumps from -|IA| to +|IA| at RA = 0
+const aaOf = (ra, ia) => (saOf(ra, ia) >= 0 ? 1 : -1) * Math.acos(clamp1(Math.cos(ia * DEG) * Math.cos(ra * DEG))) / DEG;
+const NS = "http://www.w3.org/2000/svg";
+function el(name, attrs, parent) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+}
+function drawChart(ia) {
+  svg.textContent = "";
+  for (const v of [-90, -45, 0, 45, 90]) {
+    el("line", { x1: M.l, x2: W - M.r, y1: ys(v), y2: ys(v), stroke: "var(--line)", "stroke-width": v === 0 ? 1.2 : 1 });
+    el("line", { x1: xs(v), x2: xs(v), y1: M.t, y2: H - M.b, stroke: "var(--line)", "stroke-width": v === 0 ? 1.2 : 1 });
+    el("text", { x: M.l - 6, y: ys(v) + 4, "text-anchor": "end" }).textContent = v;
+    el("text", { x: xs(v), y: H - M.b + 15, "text-anchor": "middle" }).textContent = v;
+  }
+  el("text", { x: (M.l + W - M.r) / 2, y: H - 4, "text-anchor": "middle" }).textContent = "RA (°)";
+  el("text", { x: 11, y: (M.t + H - M.b) / 2, "text-anchor": "middle",
+               transform: `rotate(-90 11 ${(M.t + H - M.b) / 2})` }).textContent = "angle (°)";
+  const path = (f, from = -90, to = 90) => {
+    let d = "";
+    for (let i = 0; i <= 180; i++) {
+      const ra = from + (to - from) * i / 180;
+      d += (d ? "L" : "M") + xs(ra).toFixed(2) + " " + ys(f(ra)).toFixed(2);
+    }
+    return d;
+  };
+  el("path", { d: path((ra) => ra), fill: "none", stroke: "var(--ra-ref)", "stroke-width": 2, "stroke-dasharray": "2 3" });
+  el("path", { d: path((ra) => saOf(ra, ia)), fill: "none", stroke: "var(--sa)", "stroke-width": 2 });
+  el("path", { d: path((ra) => e2aOf(ra, ia)), fill: "none", stroke: "var(--e2a)", "stroke-width": 2, "stroke-dasharray": "7 3" });
+  // AA in two pieces with its jump at RA = 0 left visible: open circle where it ends, filled where it starts
+  const aaStyle = { fill: "none", stroke: "var(--aa)", "stroke-width": 2, "stroke-dasharray": "5 2 1.5 2" };
+  el("path", { d: path((ra) => aaOf(ra, ia), -90, -1e-6), ...aaStyle });
+  el("path", { d: path((ra) => aaOf(ra, ia), 0, 90), ...aaStyle });
+  if (Math.abs(ia) > 0.05) {
+    el("circle", { cx: xs(0), cy: ys(-Math.abs(ia)), r: 3.5, fill: "var(--panel)", stroke: "var(--aa)", "stroke-width": 1.5 });
+    el("circle", { cx: xs(0), cy: ys(Math.abs(ia)), r: 3.5, fill: "var(--aa)" });
+  }
+
+  // current tensor
+  const ra = state.RA;
+  el("line", { x1: xs(ra), x2: xs(ra), y1: M.t, y2: H - M.b, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.35 });
+  for (const [v, col] of [[ra, "var(--ra-ref)"], [saOf(ra, ia), "var(--sa)"], [e2aOf(ra, ia), "var(--e2a)"], [aaOf(ra, ia), "var(--aa)"]]) {
+    el("circle", { cx: xs(ra), cy: ys(v), r: 4.5, fill: col, stroke: "var(--panel)", "stroke-width": 2 });
+  }
+  svg._hover = el("line", { x1: 0, x2: 0, y1: M.t, y2: H - M.b, stroke: "var(--fg)", "stroke-width": 1, opacity: 0, "stroke-dasharray": "3 3" });
+}
+function svgX(evt) {
+  const box = svg.getBoundingClientRect();
+  return (evt.clientX - box.left) / box.width * W;
+}
+svg.addEventListener("pointermove", (evt) => {
+  const ra = raFromX(svgX(evt));
+  const ia = computeAngles(state.EA, state.TA, state.RA).IA;
+  svg._hover.setAttribute("x1", xs(ra)); svg._hover.setAttribute("x2", xs(ra)); svg._hover.setAttribute("opacity", 0.6);
+  tip.hidden = false;
+  tip.innerHTML = `RA&nbsp; ${fmt(ra)}<br>SA&nbsp; ${fmt(saOf(ra, ia))}<br>E2A ${fmt(e2aOf(ra, ia))}<br>AA&nbsp; ${fmt(aaOf(ra, ia))}<br><span style="color:var(--muted)">click to set RA</span>`;
+  const wrap = document.getElementById("chart-wrap").getBoundingClientRect();
+  const box = svg.getBoundingClientRect();
+  const px = evt.clientX - wrap.left, left = px > wrap.width / 2 ? px - tip.offsetWidth - 12 : px + 12;
+  tip.style.left = left + "px";
+  tip.style.top = (box.top - wrap.top + 8) + "px";
+});
+svg.addEventListener("pointerleave", () => { tip.hidden = true; svg._hover?.setAttribute("opacity", 0); });
+svg.addEventListener("click", (evt) => {
+  const ra = Math.round(raFromX(svgX(evt)));
+  document.getElementById("ra").value = ra;
+  state.RA = ra;
+  update();
+});
+
+function update() {
+  const a = computeAngles(state.EA, state.TA, state.RA);
+  for (const k of ["ea", "ta", "ra"]) document.getElementById(k + "-out").textContent = fmt(state[k.toUpperCase()]);
+  for (const [k] of ROWS) {
+    document.getElementById("v-" + k).textContent = fmt(a[k]);
+    readout.querySelector(`tr[data-k="${k}"]`).classList.toggle("on", GROUPS[state.group].angles.includes(k));
+  }
+  document.getElementById("group-note").textContent = GROUPS[state.group].note;
+  drawChart(a.IA);
+  const saGap = Math.abs(a.RA) - Math.abs(a.SA), e2aGap = Math.abs(a.RA) - Math.abs(a.E2A);
+  document.getElementById("chart-note").textContent = Math.abs(a.IA) < 0.05
+    ? "IA = 0, so e1 lies in the radial plane and RA, SA and E2A are the same angle."
+    : `At IA = ${fmt(a.IA)}, SA is ${saGap.toFixed(1)}° smaller than RA and E2A is ${e2aGap.toFixed(1)}° smaller. ` +
+      "The three are equal only when IA = 0 (or RA = 0). " +
+      `Signed AA never gets closer to 0 than |IA|, so it jumps by ${(2 * Math.abs(a.IA)).toFixed(1)}° where its sign changes, at RA = 0.`;
+  view?.rebuild();
+}
+
+for (const k of ["ea", "ta", "ra"]) {
+  document.getElementById(k).addEventListener("input", (evt) => { state[k.toUpperCase()] = Number(evt.target.value); update(); });
+}
+document.getElementById("groups").addEventListener("change", (evt) => { state.group = evt.target.value; update(); });
+
+update();
+
+// ---------------------------------------------------------------- 3D view
+// Loaded after the panel, so the table and chart work even if the 3D view cannot start;
+// any failure is shown on the plate instead of leaving it blank.
+try {
+  const { THREE, OrbitControls, CSS2DRenderer, CSS2DObject } = await loadThree();
+  view = start3D(THREE, OrbitControls, CSS2DRenderer, CSS2DObject);
+  view.rebuild();
+} catch (err) {
+  const msg = document.createElement("p");
+  msg.className = "plate-error";
+  msg.textContent = "The 3D view could not start: " + (err && err.message ? err.message : err);
+  plate.appendChild(msg);
+  console.error(err);
+}
+
+// three.js 0.160.0: the copy in vendor/three/ first (works offline and keeps archived copies
+// self-contained), else the same version from jsDelivr (e.g. when the page is opened as a file
+// in a browser that blocks local module imports). jsDelivr's +esm builds use full URLs for their
+// own imports, so neither source needs an import map.
+async function loadThree() {
+  const sources = [
+    ["./vendor/three/three.module.min.js", "./vendor/three/OrbitControls.js", "./vendor/three/CSS2DRenderer.js"],
+    ["https://cdn.jsdelivr.net/npm/three@0.160.0/+esm",
+     "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm",
+     "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/renderers/CSS2DRenderer.js/+esm"],
+  ];
+  let lastError;
+  for (const [core, orbit, css2d] of sources) {
+    try {
+      const [THREE, { OrbitControls }, { CSS2DRenderer, CSS2DObject }] =
+        await Promise.all([import(core), import(orbit), import(css2d)]);
+      plate.dataset.three = core.startsWith("./") ? "vendor" : "cdn";  // which copy loaded, for checking
+      return { THREE, OrbitControls, CSS2DRenderer, CSS2DObject };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+function start3D(THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+plate.prepend(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.className = "labels";
+plate.insertBefore(labelRenderer.domElement, plate.querySelector(".plate-bar"));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#fbfbf9");
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+camera.up.set(0, 0, 1);
+const HOME = new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(19);
+camera.position.copy(HOME);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+controls.target.set(0, 0, 0);
+document.getElementById("reset").addEventListener("click", () => {
+  camera.position.copy(HOME); controls.target.set(0, 0, 0); controls.update();
+});
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(6, 3, 9);
+scene.add(sun);
+
+const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+
+function tag(text, pos, cls, color) {
+  const el = document.createElement("div");
+  el.className = "tag " + cls;
+  el.innerHTML = text;
+  if (color) el.style.background = color;
+  const obj = new CSS2DObject(el);
+  obj.position.copy(V(pos));
+  return obj;
+}
+
+function arrow(dir, length, color, radius) {
+  const g = new THREE.Group();
+  const head = Math.min(0.3, length * 0.25);
+  const mat = new THREE.MeshLambertMaterial({ color });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length - head, 16), mat);
+  shaft.position.y = (length - head) / 2;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius * 3, head, 20), mat);
+  cone.position.y = length - head / 2;
+  g.add(shaft, cone);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), V(norm(dir)));
+  return g;
+}
+
+function gridPlane(normalAxis, opacity) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.PlaneGeometry(6, 6),
+    new THREE.MeshBasicMaterial({ color: "#ececE8", transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })));
+  const pts = [];
+  for (let i = -3; i <= 3; i++) { pts.push(i, -3, 0, i, 3, 0, -3, i, 0, 3, i, 0); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  g.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: "#8f918a", transparent: true, opacity: Math.min(1, opacity + 0.15) })));
+  if (normalAxis === "r") g.rotation.y = Math.PI / 2;
+  g.renderOrder = 1;
+  return g;
+}
+
+// fixed scene: radial plane (C-L), longitudinal plane (R-C), R C L axes
+scene.add(gridPlane("r", 0.55));
+scene.add(gridPlane("l", 0.22));
+const AXES = [["R", [1, 0, 0], [3.75, -0.35, 0]], ["C", [0, 1, 0], [0, 3.8, 0]], ["L", [0, 0, 1], [0, 0, 3.65]]];
+for (const [name, dir, at] of AXES) {
+  scene.add(arrow(dir, 3.5, "#c4c5bf", 0.022));
+  scene.add(tag(name, at, "axis"));
+}
+
+// slerp from unit a to unit b; returns points of a filled wedge (triangle fan) of the given radius
+function slerp(a, b, t) {
+  const th = Math.acos(clamp1(dot(a, b)));
+  if (th < 1e-6) return a;
+  const s = Math.sin(th);
+  return add(scale(a, Math.sin((1 - t) * th) / s), scale(b, Math.sin(t * th) / s));
+}
+function wedge(group, from, to, radius, color, label, labelRadius) {
+  const a = norm(from), b = norm(to);
+  if (Math.acos(clamp1(dot(a, b))) < 0.3 * DEG) return;  // nothing to fill
+  const N = 64, pos = [0, 0, 0];
+  for (let i = 0; i <= N; i++) pos.push(...scale(slerp(a, b, i / N), radius));
+  const idx = [];
+  for (let i = 1; i <= N; i++) idx.push(0, i, i + 1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  mesh.renderOrder = 2;
+  group.add(mesh);
+  group.add(tag(label, scale(slerp(a, b, 0.5), labelRadius ?? radius * 1.15), "angle", color));
+}
+function refLine(group, dir, length, label) {
+  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), V(scale(norm(dir), length))]);
+  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: "#3a3c44", dashSize: 0.12, gapSize: 0.08 }));
+  line.computeLineDistances();
+  group.add(line);
+  if (label) group.add(tag(label, scale(norm(dir), length + 0.25), "ref"));
+}
+function sheet(group, geometry, normal, color, opacity) {
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), V(norm(normal)));
+  mesh.renderOrder = 1;
+  group.add(mesh);
+}
+
+let dynamic = new THREE.Group();
+scene.add(dynamic);
+
+function clearDynamic() {
+  const labels = [];
+  dynamic.traverse((o) => {
+    if (o.isCSS2DObject) labels.push(o);
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  labels.forEach((o) => o.removeFromParent());  // removes the label's element from the page
+  scene.remove(dynamic);
+  dynamic = new THREE.Group();
+  scene.add(dynamic);
+}
+
+function rebuild() {
+  clearDynamic();
+  const { EA, TA, RA, group } = state;
+  const { e1, e2, e3, e2SA0 } = makeFibre(EA, TA, RA);
+  const r = [1, 0, 0], c = [0, 1, 0];
+  const vcm = norm(cross(r, e1));
+
+  // tensor: cuboid long along e1, then e2, thin along e3; eigenvector arrows of length 3, 2, 1
+  const basis = new THREE.Matrix4().makeBasis(V(e1), V(e2), V(e3));
+  const box = new THREE.BoxGeometry(4, 2, 0.25);
+  const cuboid = new THREE.Mesh(box, new THREE.MeshLambertMaterial({ color: "#e6e6e2" }));
+  cuboid.applyMatrix4(basis);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: "#55575e" }));
+  edges.applyMatrix4(basis);
+  dynamic.add(cuboid, edges);
+  [[e1, 3, "e<sub>1</sub>"], [e2, 2, "e<sub>2</sub>"], [e3, 1, "e<sub>3</sub>"]].forEach(([v, len, name]) => {
+    dynamic.add(arrow(v, len, "#1d1e22", 0.03));
+    dynamic.add(tag(name, scale(v, len + 0.28), "ref"));
+  });
+
+  const e1Rad = [0, e1[1], e1[2]];          // e1 projected into the radial plane
+  const e1Lon = [e1[0], e1[1], 0];          // e1 projected into the R-C plane
+  const e2Rad = [0, e2[1], e2[2]];          // e2 projected into the radial plane
+  const nCmR = norm(cross(vcm, r));         // normal of the v_cm-R plane
+  const e2Proj = add(e2, scale(nCmR, -dot(e2, nCmR)));
+
+  if (group === "define") {
+    sheet(dynamic, new THREE.CircleGeometry(3, 64), e1, COLORS.RA, 0.14);
+    refLine(dynamic, e1Lon, 3, "");
+    refLine(dynamic, vcm, 3, "v<sub>cm</sub>");  // past the RA / E2A label
+    wedge(dynamic, c, e1Lon, 3, COLORS.TA, "TA");
+    wedge(dynamic, e1Lon, e1, 3, COLORS.EA, "EA");
+    wedge(dynamic, e2SA0, e2, 2, COLORS.RA, "RA");
+  } else if (group === "nonproj") {
+    refLine(dynamic, e1Rad, 3, "");
+    refLine(dynamic, e2Rad, 2, "");
+    wedge(dynamic, e1Rad, e1, 3, COLORS.IA, "IA");
+    wedge(dynamic, e2Rad, e2, 2, COLORS.SA, "SA");
+    wedge(dynamic, e3, r, 1.2, COLORS.AA, "AA", 2.1);
+  } else {
+    sheet(dynamic, new THREE.PlaneGeometry(6, 6), nCmR, COLORS.E2A, 0.14);
+    refLine(dynamic, e1Rad, 3, "");
+    refLine(dynamic, vcm, 3, "v<sub>cm</sub>");  // past the RA / E2A label
+    refLine(dynamic, e2Proj, 2, "");
+    wedge(dynamic, c, e1Rad, 3, COLORS.HA, "HA");
+    wedge(dynamic, vcm, e2Proj, 2, COLORS.E2A, "E2A");
+  }
+}
+
+function resize() {
+  const w = plate.clientWidth, h = plate.clientHeight;
+  renderer.setSize(w, h);
+  labelRenderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(plate);
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+});
+
+resize();
+return { rebuild };
+}
+</script>
