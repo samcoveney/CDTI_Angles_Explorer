@@ -1,4 +1,4 @@
-# CDTI Angle Explorer
+# CDTI Angles Explorer
 
 An interactive 3D view of a cardiac diffusion tensor in the local left-ventricular frame
 (radial R, circumferential C, longitudinal L), showing how each angle used to describe the
