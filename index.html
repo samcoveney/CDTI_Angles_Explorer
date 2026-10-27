@@ -637,9 +637,9 @@ function rebuild() {
     wedge(dynamic, e3, r, 1.2, COLORS.AA, "AA", 2.1);
   } else {
     sheet(dynamic, new THREE.PlaneGeometry(6, 6), nCmR, COLORS.E2A, 0.14);
-    refLine(dynamic, e1Rad, 3, "");
+    refLine(dynamic, e1Rad, 3.6, "e<sub>1</sub><sup>proj</sup>");  // past the HA wedge
     refLine(dynamic, vcm, 3, "v<sub>cm</sub>");  // past the RA / E2A label
-    refLine(dynamic, e2Proj, 2, "");
+    refLine(dynamic, e2Proj, 3.4, "e<sub>2</sub><sup>proj</sup>");  // label clear of the E2A label
     wedge(dynamic, c, e1Rad, 3, COLORS.HA, "HA");
     wedge(dynamic, vcm, e2Proj, 2, COLORS.E2A, "E2A");
   }
