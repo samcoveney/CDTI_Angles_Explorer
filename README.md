@@ -2,16 +2,18 @@
 
 An interactive 3D view of a cardiac diffusion tensor in the local left-ventricular frame
 (radial R, circumferential C, longitudinal L), showing how each angle used to describe the
-tensor is measured. Set the tensor with sliders, rotate it, and switch between three
+tensor is measured. Set the tensor with the forward model's angles (HA, IA, RA), rotate it, and switch between three
 families of angles:
 
 | View | Angles | What they measure |
 |---|---|---|
-| Defining | EA, TA, RA | The forward model: EA and TA place the fibre direction e1; RA rolls the sheetlet (e2, e3) about e1, from the cross-myocyte vector v_cm |
-| Non-projected | IA, SA, AA | e1 and e2 against the radial plane (C–L), and e3 against R |
-| Projected | HA, E2A | The conventional angles, each measured after projecting an eigenvector into a plane |
+| The forward model | HA, IA, RA | The sliders. HA: the fibre direction e1 within the wall; IA: how steeply e1 dives into the wall; RA: the roll of the sheetlet (e2, e3) about e1, from the cross-myocyte vector v_cm (flat in the wall) towards v_rad (standing across it) |
+| Alternative angles | EA, TA, SIA | EA and TA describe e1 with l as the pole (elevation out of the R–C plane, azimuth within it); SIA is e2 against the wall (C–L) plane |
+| Describing the aggregate | E2A, AA | E2A: e2 projected into the v_cm–R plane, from v_cm (close to RA); AA: the sheetlet normal e3 against R |
 
-A chart shows how SA, E2A and AA differ from RA at the current intrusion angle IA. RA, SA and
+Angles that nearly coincide (HA and EA; IA and TA; RA, SIA and E2A) are in different views, so each is visible.
+
+A chart shows how SIA, E2A and AA differ from RA at the current intrusion angle IA. RA, SIA and
 E2A are equal only when IA = 0; signed AA never gets closer to 0 than |IA|, so it jumps by
 2|IA| where its sign changes.
 

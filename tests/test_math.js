@@ -11,7 +11,7 @@ const cases = JSON.parse(await Deno.readTextFile(here("reference_cases.json")));
 const TOL = 1e-6;  // degrees
 let worst = { err: 0 };
 for (const ref of cases) {
-  const got = computeAngles(ref.EA, ref.TA, ref.RA);
+  const got = computeAngles(ref.HA, ref.IA, ref.RA)  // the page's forward model takes (HA, IA, RA);
   for (const k of Object.keys(ref)) {
     const err = Math.abs(got[k] - ref[k]);
     if (err > worst.err) worst = { err, k, ref, got: got[k] };
