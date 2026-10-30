@@ -211,9 +211,9 @@
       <section>
         <p class="eyebrow">Tensor</p>
         <div class="sliders">
-          <div class="slider"><label for="ha">HA</label><input type="range" id="ha" min="-85" max="85" step="1" value="63"><output for="ha" id="ha-out"></output></div>
+          <div class="slider"><label for="ha">HA</label><input type="range" id="ha" min="-85" max="85" step="1" value="60"><output for="ha" id="ha-out"></output></div>
           <div class="slider"><label for="ia">IA</label><input type="range" id="ia" min="-85" max="85" step="1" value="15"><output for="ia" id="ia-out"></output></div>
-          <div class="slider"><label for="ra">RA</label><input type="range" id="ra" min="-90" max="90" step="1" value="20"><output for="ra" id="ra-out"></output></div>
+          <div class="slider"><label for="ra">RA</label><input type="range" id="ra" min="-90" max="90" step="1" value="40"><output for="ra" id="ra-out"></output></div>
         </div>
       </section>
 
@@ -294,7 +294,7 @@ const GROUPS = {
   model: { angles: ["HA", "IA", "RA"],
            note: "The forward model, set with the sliders. HA is the fibre's direction within the wall, IA how steeply it dives into the wall, and RA the roll of the sheetlet about e1, from v_cm (lying flat in the wall) towards v_rad (standing across it)." },
   alt: { angles: ["EA", "TA", "SIA"],
-         note: "Alternative angles for the same tensor. EA and TA describe e1 with l as the pole instead of r: elevation out of the R–C plane, and azimuth within it. SIA is e2 against the wall (C–L) plane." },
+         note: "Alternative angles for the same tensor. EA and TA describe e1 with l as the pole instead of r: elevation out of the R–C plane, and azimuth within it. SIA is e2 against the wall (C–L) plane; its foot in the wall is not along v_cm, and swings towards e1's projection as the sheetlet rolls." },
   lit: { angles: ["E2A", "AA"],
          note: "Describing the aggregate (the sheetlet). E2A: e2 projected into the v_cm–R plane, measured from v_cm; close to RA. AA: the sheetlet normal e3 against R." },
 };
@@ -309,7 +309,7 @@ const ROWS = [
   ["AA", "e3 against R, signed like RA"],
 ];
 
-const state = { HA: 63, IA: 15, RA: 20, group: "model" };
+const state = { HA: 60, IA: 15, RA: 40, group: "model" };
 const plate = document.getElementById("plate");
 let view = null;  // the 3D view, once it has started
 
@@ -629,6 +629,7 @@ function rebuild() {
   } else if (group === "alt") {
     refLine(dynamic, e1Lon, 3, "");
     refLine(dynamic, e2Rad, 2, "");
+    refLine(dynamic, vcm, 3, "v<sub>cm</sub>");  // SIA is not measured from v_cm: its foot (e2Rad) misses it
     wedge(dynamic, c, e1Lon, 3, COLORS.TA, "TA");
     wedge(dynamic, e1Lon, e1, 3, COLORS.EA, "EA");
     wedge(dynamic, e2Rad, e2, 2, COLORS.SIA, "SIA");
